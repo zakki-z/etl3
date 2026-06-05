@@ -1,30 +1,10 @@
-# Python
-*.py[cod]
-*$py.class
-*.so
-
-# Virtual Environment
-.venv/
-venv/
-ENV/
-env/
-
-# PyCharm
-.idea/
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# Unit test / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Environment variables
 .env
-
-# OS
-.DS_Store
-Thumbs.db
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/

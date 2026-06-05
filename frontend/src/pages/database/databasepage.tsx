@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useMsal } from '@azure/msal-react';
 import DataTable from '../../components/database/database';
 import { tableDefinitions, DatabaseTable } from '../../services/databaseService';
 import {
@@ -21,7 +20,6 @@ function toTableRows<T extends object>(rows: T[]): Record<string, unknown>[] {
 }
 
 function DatabasePage() {
-    const { instance } = useMsal();
     const [selectedTable, setSelectedTable] = useState<string>(tableDefinitions[0].name);
     const [currentTable, setCurrentTable] = useState<DatabaseTable | null>(null);
     const [loading, setLoading] = useState(false);
@@ -30,39 +28,39 @@ function DatabasePage() {
     const fetchRowsByTableName = useCallback(async (tableName: string): Promise<Record<string, unknown>[]> => {
         switch (tableName) {
             case 'server':
-                return toTableRows(await fetchServers(instance));
+                return toTableRows(await fetchServers());
 
             case 'cft_partner':
-                return toTableRows(await fetchCFTPartners(instance));
+                return toTableRows(await fetchCFTPartners());
 
             case 'cft_flow':
-                return toTableRows(await fetchCFTFlows(instance));
+                return toTableRows(await fetchCFTFlows());
 
             case 'cft_tcp':
-                return toTableRows(await fetchCFTTCP(instance));
+                return toTableRows(await fetchCFTTCP());
 
             case 'transfer':
-                return toTableRows(await fetchTransfers(instance));
+                return toTableRows(await fetchTransfers());
 
             case 'flow_action':
-                return toTableRows(await fetchFlowActions(instance));
+                return toTableRows(await fetchFlowActions());
 
             case 'post_processing_scripts':
-                return toTableRows(await fetchPostProcessingScripts(instance));
+                return toTableRows(await fetchPostProcessingScripts());
 
             case 'moncft_config':
-                return toTableRows(await fetchCFTConfig(instance));
+                return toTableRows(await fetchCFTConfig());
 
             case 'boscosend_config':
-                return toTableRows(await fetchBoscoSendConfig(instance));
+                return toTableRows(await fetchBoscoSendConfig());
 
             case 'cft_tcp_without_partner':
-                return toTableRows(await fetchCFTWithoutPartner(instance));
+                return toTableRows(await fetchCFTWithoutPartner());
 
             default:
                 return [];
         }
-    }, [instance]);
+    }, []);
 
     const loadTable = useCallback(async () => {
         const def = tableDefinitions.find((table) => table.name === selectedTable);
