@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/v1/pipeline", tags=["pipeline"])
 
@@ -14,10 +14,15 @@ _AIRFLOW_AUTH_URL = os.getenv("AIRFLOW_AUTH_URL", "http://localhost:8080/auth/to
 _AIRFLOW_DAG_ID   = os.getenv("AIRFLOW_DAG_ID",   "cft_daily_import")
 _AIRFLOW_USER     = os.getenv("AIRFLOW_API_USER",  "admin")
 
-# Password resolution order:
-#   1. AIRFLOW_API_PASSWORD env var (set in .env)
-#   2. Airflow's generated password file (standalone mode on Mac/Linux)
 _AIRFLOW_PASS_FILE = Path.home() / "airflow" / "simple_auth_manager_passwords.json.generated"
+
+# Sentinel dict returned when Airflow is not reachable / not configured.
+_UNREACHABLE = {
+    "state": "unreachable",
+    "dag_run_id": None,
+    "start_date": None,
+    "end_date": None,
+}
 
 
 def _resolve_password() -> str:
@@ -33,11 +38,15 @@ def _resolve_password() -> str:
     return ""
 
 
-def _get_token() -> str:
-    """Obtain a bearer token from Airflow 3 SimpleAuthManager."""
+def _get_token() -> str | None:
+    """Obtain a bearer token from Airflow 3 SimpleAuthManager.
+
+    Returns None (instead of raising) when Airflow is not configured or
+    not reachable, so callers can degrade gracefully.
+    """
     password = _resolve_password()
     if not password:
-        raise HTTPException(status_code=502, detail="Airflow password not configured")
+        return None
 
     try:
         with httpx.Client(timeout=10) as client:
@@ -46,19 +55,14 @@ def _get_token() -> str:
                 json={"username": _AIRFLOW_USER, "password": password},
             )
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="Airflow is not reachable")
+        return None
 
     if resp.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Airflow auth failed ({resp.status_code}): {resp.text}",
-        )
+        return None
 
     data = resp.json()
     token = data.get("access_token") or data.get("token")
-    if not token:
-        raise HTTPException(status_code=502, detail="Airflow returned no token")
-    return token
+    return token or None
 
 
 def _airflow_client(token: str) -> httpx.Client:
@@ -71,44 +75,60 @@ def _airflow_client(token: str) -> httpx.Client:
 
 @router.post("/trigger")
 def trigger_pipeline() -> dict:
+    token = _get_token()
+    if token is None:
+        return {
+            "dag_run_id": None,
+            "state": "unreachable",
+            "logical_date": None,
+            "error": "Airflow is not reachable or not configured (AIRFLOW_API_PASSWORD missing).",
+        }
+
     try:
-        token = _get_token()
         with _airflow_client(token) as client:
             resp = client.post(
                 f"/dags/{_AIRFLOW_DAG_ID}/dagRuns",
                 json={"dag_run_id": None},
             )
             if resp.status_code not in (200, 201):
-                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+                return {
+                    "dag_run_id": None,
+                    "state": "error",
+                    "logical_date": None,
+                    "error": f"Airflow returned {resp.status_code}: {resp.text}",
+                }
             data = resp.json()
         return {
             "dag_run_id": data.get("dag_run_id"),
-            "state":       data.get("state"),
+            "state":      data.get("state"),
             "logical_date": data.get("logical_date"),
         }
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="Airflow is not reachable")
+        return {
+            "dag_run_id": None,
+            "state": "unreachable",
+            "logical_date": None,
+            "error": "Airflow is not reachable.",
+        }
 
 
 @router.get("/status")
 def pipeline_status() -> dict:
+    token = _get_token()
+    if token is None:
+        return _UNREACHABLE
+
     try:
-        token = _get_token()
         with _airflow_client(token) as client:
             resp = client.get(
                 f"/dags/{_AIRFLOW_DAG_ID}/dagRuns",
                 params={"limit": 1, "order_by": "-startDate"},
             )
             if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+                return _UNREACHABLE
             runs = resp.json().get("dag_runs", [])
     except httpx.ConnectError:
-        return {
-            "state": "unreachable",
-            "dag_run_id": None,
-            "start_date": None,
-            "end_date": None,
-        }
+        return _UNREACHABLE
 
     if not runs:
         return {
