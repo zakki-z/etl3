@@ -234,3 +234,50 @@ export const databaseService = {
     return { ...def, rows };
   },
 };
+// ── Summary stats ────────────────────────────────────────────────────────
+
+export interface InventoryStats {
+  partners: number;
+  partners_ssl: number;
+  flows_send: number;
+  flows_recv: number;
+  flows_xlate: number;
+  transfers_ok: number;
+  transfers_nok: number;
+  servers: number;
+  scripts: number;
+  tcp_without_partner: number;
+}
+
+export async function fetchStats(): Promise<InventoryStats | null> {
+  try {
+    return await api.get<InventoryStats>('/api/v1/stats');
+  } catch {
+    return null;
+  }
+}
+
+// ── Pipeline control ─────────────────────────────────────────────────────
+
+export interface PipelineStatus {
+  dag_run_id: string | null;
+  state: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export async function fetchPipelineStatus(): Promise<PipelineStatus | null> {
+  try {
+    return await api.get<PipelineStatus>('/api/v1/pipeline/status');
+  } catch {
+    return null;
+  }
+}
+
+export async function triggerPipeline(): Promise<{ dag_run_id: string; state: string } | null> {
+  try {
+    return await api.post('/api/v1/pipeline/trigger', {});
+  } catch {
+    return null;
+  }
+}

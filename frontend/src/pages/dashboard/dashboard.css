@@ -33,6 +33,7 @@
     text-decoration: underline;
 }
 
+/* ── Metrics grid ────────────────────────────────────── */
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -50,12 +51,14 @@
     color: var(--color-text-muted);
     display: block;
     margin-bottom: var(--spacing-sm);
+    font-size: 0.85rem;
 }
 
 .metric-card strong {
     font-size: 2rem;
 }
 
+/* ── Detail panels ───────────────────────────────────── */
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -67,14 +70,23 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
 }
 
 .dashboard-panel h3 {
     margin-bottom: var(--spacing-lg);
 }
 
-.outcome-row,
-.server-item {
+.loading-text {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin: 0;
+}
+
+/* ── Outcome rows ────────────────────────────────────── */
+.outcome-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -83,58 +95,84 @@
     padding: var(--spacing-md) 0;
 }
 
-.outcome-row:first-of-type,
-.server-item:first-child {
-    padding-top: 0;
-}
+.outcome-row:first-of-type { padding-top: 0; }
+.outcome-row:last-of-type  { border-bottom: 0; padding-bottom: 0; }
 
-.outcome-row:last-child,
-.server-item:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
-}
+.outcome-row.success strong { color: #15803d; }
+.outcome-row.failed  strong { color: #dc2626; }
+.outcome-row.pending strong { color: #d97706; }
 
-.outcome-row.success strong {
-    color: #15803d;
-}
-
-.outcome-row.failed strong {
-    color: #dc2626;
-}
-
-.outcome-row.pending strong {
-    color: #d97706;
-}
-
-.server-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.server-item div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.server-item span {
-    color: var(--color-text-muted);
-}
-
-.server-status {
-    background: var(--color-background-alt);
+/* ── Airflow state badge ─────────────────────────────── */
+.state-badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
     border-radius: 999px;
-    padding: 0.25rem 0.75rem;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
-.activity-panel ul {
+.state-success { background: #dcfce7; color: #166534; }
+.state-running { background: #dbeafe; color: #1d4ed8; }
+.state-failed  { background: #fee2e2; color: #991b1b; }
+.state-queued  { background: #fef9c3; color: #92400e; }
+.state-none    { background: var(--color-background-alt); color: var(--color-text-muted); }
+
+/* ── Run ID truncation ───────────────────────────────── */
+.run-id {
+    font-size: 0.78rem;
+    font-family: 'SF Mono', Monaco, monospace;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* ── Trigger zone ────────────────────────────────────── */
+.trigger-zone {
+    margin-top: auto;
+    padding-top: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.trigger-btn {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.trigger-btn:hover:not(:disabled) {
+    background: var(--color-primary-dark);
+    transform: translateY(-1px);
+}
+
+.trigger-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.trigger-msg {
+    font-size: 0.82rem;
     margin: 0;
-    padding-left: var(--spacing-lg);
-    color: var(--color-text-muted);
-    line-height: 1.8;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius);
 }
 
+.trigger-msg--ok    { background: #dcfce7; color: #166534; }
+.trigger-msg--error { background: #fee2e2; color: #991b1b; }
+
+/* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 640px) {
     .dashboard-header {
         align-items: flex-start;
