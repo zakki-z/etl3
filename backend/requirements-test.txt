@@ -1,0 +1,6 @@
+SQLAlchemy>=2.0
+PyMySQL>=1.1
+fastapi
+httpx
+pytest>=8.0
+pytest-cov>=5.0
