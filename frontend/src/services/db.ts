@@ -1,5 +1,19 @@
 /**
  * Database service — fetches live data from the backend API.
+ *
+ * Each "table" corresponds to a real backend endpoint + SQLAlchemy model.
+ * The column definitions mirror the backend Pydantic response schemas
+ * and are kept in sync with the actual `migration_db` MySQL schema.
+ *
+ * Endpoint reality check (backend/migration_project/routers/):
+ *   servers.py          → /api/v1/servers
+ *   partners.py         → /api/v1/partners
+ *   flows.py            → /api/v1/flows
+ *   transfers.py        → /api/v1/transfers
+ *   scripts.py          → /api/v1/scripts
+ *   stats.py            → /api/v1/stats
+ *   pipeline.py         → /api/v1/pipeline
+ *
  * Tables without a dedicated router yet (cft_tcp, flow_action, moncft_config,
  * boscosend_config, stg_cft_tcp_without_partner, b2bi_*, community, views)
  * have their endpoint marked with a TODO prefix so the UI can surface them
