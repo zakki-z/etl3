@@ -6,13 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from migration_project.routers import (
     boscosend_configs,
     cft_tcp,
+    exceptions,
     flow_actions,
     flows,
+    generation_jobs,
+    mapping_rules,
     moncft_configs,
     partners,
     pipeline,
     scripts,
     servers,
+    ssh_pull,
     stats,
     stg_cft_tcp,
     transfers,
@@ -20,8 +24,8 @@ from migration_project.routers import (
 
 app = FastAPI(
     title="Stroom — CFT Inventory API",
-    version="1.0.0",
-    description="Phase 1 inventory API for the CFT-to-B2Bi migration platform.",
+    version="2.0.0",
+    description="Phase 1 inventory + Phase 2 generation API for the CFT-to-B2Bi migration platform.",
 )
 
 app.add_middleware(
@@ -44,6 +48,12 @@ app.include_router(flow_actions.router)
 app.include_router(moncft_configs.router)
 app.include_router(boscosend_configs.router)
 app.include_router(stg_cft_tcp.router)
+app.include_router(ssh_pull.router)
+
+# ── Phase 2 routers ──────────────────────────────────────────────────────
+app.include_router(mapping_rules.router)
+app.include_router(generation_jobs.router)
+app.include_router(exceptions.router)
 
 
 @app.get("/health")

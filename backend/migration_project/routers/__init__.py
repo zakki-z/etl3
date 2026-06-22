@@ -1,8 +1,11 @@
 from migration_project.routers import (
     boscosend_configs,
     cft_tcp,
+    exceptions,
     flow_actions,
     flows,
+    generation_jobs,
+    mapping_rules,
     moncft_configs,
     partners,
     pipeline,
@@ -11,13 +14,17 @@ from migration_project.routers import (
     stats,
     stg_cft_tcp,
     transfers,
+    ssh_pull,
 )
 
 __all__ = [
     "boscosend_configs",
     "cft_tcp",
+    "exceptions",
     "flow_actions",
     "flows",
+    "generation_jobs",
+    "mapping_rules",
     "moncft_configs",
     "partners",
     "pipeline",
@@ -26,4 +33,5 @@ __all__ = [
     "stats",
     "stg_cft_tcp",
     "transfers",
+    "ssh_pull",
 ]

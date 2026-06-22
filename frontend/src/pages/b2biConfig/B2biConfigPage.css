@@ -72,7 +72,6 @@
 .pipeline-bar {
     display: flex;
     align-items: center;
-    gap: 0;
     background: var(--color-background);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
@@ -85,7 +84,6 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    position: relative;
 }
 
 .pipeline-step-num {
@@ -256,15 +254,8 @@
     transition: background 0.1s, border-color 0.1s;
 }
 
-.job-item:hover {
-    background: var(--color-background-alt);
-    border-color: #cbd5e1;
-}
-
-.job-item--selected {
-    border-color: var(--color-primary);
-    background: #eef2ff;
-}
+.job-item:hover { background: var(--color-background-alt); border-color: #cbd5e1; }
+.job-item--selected { border-color: var(--color-primary); background: #eef2ff; }
 
 .job-item-top {
     display: flex;
@@ -346,11 +337,7 @@
 }
 
 .filter-btn:hover { border-color: #94a3b8; color: var(--color-text); }
-.filter-btn--active {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
-}
+.filter-btn--active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
 .exc-list {
     list-style: none;
@@ -372,9 +359,7 @@
     gap: 0.3rem;
 }
 
-.exc-item--resolved {
-    opacity: 0.55;
-}
+.exc-item--resolved { opacity: 0.55; }
 
 .exc-item-top {
     display: flex;
@@ -410,7 +395,7 @@
 }
 
 .exc-partner { font-family: 'SF Mono', Monaco, monospace; }
-.exc-field   { font-style: italic; }
+.exc-field   { font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Configs table ───────────────────────────────────── */
 .sync-legend {
@@ -434,10 +419,10 @@
     flex-shrink: 0;
 }
 
-.sync-dot--draft    { background: #d1d5db; }
+.sync-dot--pending  { background: #d1d5db; }
 .sync-dot--approved { background: #22c55e; }
-.sync-dot--pushed   { background: #7c3aed; }
-.sync-dot--error    { background: #ef4444; }
+.sync-dot--deployed { background: #7c3aed; }
+.sync-dot--failed   { background: #ef4444; }
 
 .config-table-wrap {
     overflow-x: auto;
@@ -478,21 +463,76 @@
     color: var(--color-text-muted);
 }
 
+/* ── Inline action buttons (Approuver / Résoudre) ────── */
+.action-btn-sm {
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: transparent;
+    font-size: 0.75rem;
+    font-family: inherit;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+
+.action-btn-sm:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.action-btn-sm--primary {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.action-btn-sm--primary:hover {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* ── Mapping rule toggle button ──────────────────────── */
+.toggle-btn {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.12s;
+}
+
+.toggle-btn--on {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+}
+
+.toggle-btn--on:hover {
+    background: #bbf7d0;
+}
+
+.toggle-btn--off {
+    background: #f3f4f6;
+    color: #9ca3af;
+    border-color: #e5e7eb;
+}
+
+.toggle-btn--off:hover {
+    background: #e5e7eb;
+    color: var(--color-text);
+}
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 900px) {
-    .b2bi-grid {
-        grid-template-columns: 1fr;
-    }
-    .panel--wide {
-        grid-column: 1;
-    }
+    .b2bi-grid { grid-template-columns: 1fr; }
+    .panel--wide { grid-column: 1; }
 }
 
 @media (max-width: 640px) {
-    .b2bi-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
+    .b2bi-header { flex-direction: column; align-items: stretch; }
     .trigger-btn { width: 100%; text-align: center; }
     .pipeline-bar { flex-direction: column; align-items: flex-start; }
     .pipeline-step-arrow { display: none; }
