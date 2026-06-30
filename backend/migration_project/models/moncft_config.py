@@ -14,10 +14,10 @@ class MonCftConfig(Base):
     transfer_id: Mapped[int | None] = mapped_column(
         BIGINT(unsigned=True), ForeignKey("transfer.id"), nullable=True
     )
-    fname: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    filtre: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    parm: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    nfname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    fname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    filtre: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    parm: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    nfname: Mapped[str | None] = mapped_column(String(100), nullable=True)
     sappl: Mapped[str | None] = mapped_column(String(100), nullable=True)
     rappl: Mapped[str | None] = mapped_column(String(100), nullable=True)
     suser: Mapped[str | None] = mapped_column(String(100), nullable=True)

@@ -61,14 +61,6 @@ function Sidebar() {
                     <span className="sidebar-icon">📊</span>
                     {!isCollapsed && <span>Dashboard</span>}
                 </Link>
-                <Link
-                    to="/server-config"
-                    className={location.pathname === '/server-config' ? 'sidebar-link active' : 'sidebar-link'}
-                    title="Config de serveur"
-                >
-                    <span className="sidebar-icon">⚙</span>
-                    {!isCollapsed && <span>Config de serveur</span>}
-                </Link>
 
                 <Link
                     to="/database"

@@ -20,5 +20,5 @@ class CftFlow(Base):
     frecfm: Mapped[str | None] = mapped_column(String(100), nullable=True)
     fname: Mapped[str | None] = mapped_column(String(100), nullable=True)
     xlate: Mapped[int | None] = mapped_column(TINYINT(1), nullable=True)
-    exec: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    exece: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    exec: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    exece: Mapped[str | None] = mapped_column(String(100), nullable=True)

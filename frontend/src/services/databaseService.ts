@@ -1,9 +1,6 @@
 /**
  * Database service — fetches live data from the backend API.
- * Tables without a dedicated router yet (cft_tcp, flow_action, moncft_config,
- * boscosend_config, stg_cft_tcp_without_partner, b2bi_*, community, views)
- * have their endpoint marked with a TODO prefix so the UI can surface them
- * as "coming soon" rather than silently returning empty rows.
+ * Every table and view now has a dedicated router; nothing is left as TODO.
  */
 import { api } from './api';
 
@@ -169,7 +166,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'b2bi_partner',
     description: 'Partenaires B2Bi générés (Trading Partners)',
-    endpoint: 'TODO:/api/v1/b2bi-partners',         // ❌ Phase 2 — no router yet
+    endpoint: '/api/v1/b2bi-partners',              // ✅ b2bi_partners.py
     columns: [
       { name: 'b2bi_partner_id',      type: 'int'     },
       { name: 'partner_code',         type: 'string'  },
@@ -186,7 +183,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'b2bi_partner_delivery',
     description: 'Canaux de livraison B2Bi (delivery channels)',
-    endpoint: 'TODO:/api/v1/b2bi-partner-deliveries', // ❌ Phase 2 — no router yet
+    endpoint: '/api/v1/b2bi-partner-deliveries',    // ✅ b2bi_partner_deliveries.py
     columns: [
       { name: 'partner_delivery_id',     type: 'int'    },
       { name: 'friendly_name',           type: 'string' },
@@ -208,7 +205,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'b2bi_inbound_flow',
     description: 'Flux entrants B2Bi (inbound flows)',
-    endpoint: 'TODO:/api/v1/b2bi-inbound-flows',    // ❌ Phase 2 — no router yet
+    endpoint: '/api/v1/b2bi-inbound-flows',         // ✅ b2bi_inbound_flows.py
     columns: [
       { name: 'inbound_flow_id',  type: 'int'    },
       { name: 'idf',              type: 'string' },
@@ -226,7 +223,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'community',
     description: 'Communautés B2Bi (routing communities)',
-    endpoint: 'TODO:/api/v1/communities',           // ❌ Phase 2 — no router yet
+    endpoint: '/api/v1/communities',                // ✅ communities.py
     columns: [
       { name: 'community_id',       type: 'string' },
       { name: 'name',               type: 'string' },
@@ -236,7 +233,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'community_routing_ids',
     description: 'Identifiants de routage par communauté',
-    endpoint: 'TODO:/api/v1/community-routing-ids', // ❌ Phase 2 — no router yet
+    endpoint: '/api/v1/community-routing-ids',      // ✅ community_routing_ids.py
     columns: [
       { name: 'routing_id',   type: 'string' },
       { name: 'community_id', type: 'string' },
@@ -247,7 +244,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'v_cft_flow_xlate_enabled',
     description: 'Vue — flux CFT avec translation activée',
-    endpoint: 'TODO:/api/v1/views/cft-flow-xlate-enabled', // ❌ no router yet
+    endpoint: '/api/v1/views/cft-flow-xlate-enabled',   // ✅ views.py
     columns: [
       { name: 'idf_code', type: 'string'  },
       { name: 'direct',   type: 'string'  },
@@ -262,7 +259,7 @@ export const tableDefinitions: Omit<DatabaseTable, 'rows'>[] = [
   {
     name: 'v_cft_partner_ssl_enabled',
     description: 'Vue — partenaires CFT avec SSL activé',
-    endpoint: 'TODO:/api/v1/views/cft-partner-ssl-enabled', // ❌ no router yet
+    endpoint: '/api/v1/views/cft-partner-ssl-enabled',  // ✅ views.py
     columns: [
       { name: 'id',      type: 'string'  },
       { name: 'nspart',  type: 'string'  },

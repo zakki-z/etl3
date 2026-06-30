@@ -11,4 +11,4 @@ class Server(Base):
 
     id: Mapped[str] = mapped_column(String(19), primary_key=True)
     host: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    environment: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    environment: Mapped[str | None] = mapped_column(String(50), nullable=True)

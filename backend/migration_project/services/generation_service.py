@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, UTC
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -65,6 +66,7 @@ class GenerationService:
                     "partner_id": result.partner_id,
                     "payload": result.payload,
                     "sync_status": "PENDING",
+                    "generated_at": datetime.now(UTC).replace(tzinfo=None),
                 })
 
                 for exc in result.exceptions:
@@ -118,7 +120,7 @@ def _load_all_partner_contexts(session: Session) -> list[PartnerContext]:
             p.id        AS partner_id,
             p.nspart,
             p.nrpart,
-            p.`ssl`     AS ssl,
+            p.`ssl`     AS `ssl`,
             p.sap,
             t.host,
             t.cnxout

@@ -1,6 +1,10 @@
 from migration_project.routers import (
+    b2bi_inbound_flows,
+    b2bi_partner_deliveries,
+    b2bi_partners,
     boscosend_configs,
     cft_tcp,
+    communities,
     exceptions,
     flow_actions,
     flows,
@@ -14,12 +18,17 @@ from migration_project.routers import (
     stats,
     stg_cft_tcp,
     transfers,
+    views,
     ssh_pull,
 )
 
 __all__ = [
+    "b2bi_inbound_flows",
+    "b2bi_partner_deliveries",
+    "b2bi_partners",
     "boscosend_configs",
     "cft_tcp",
+    "communities",
     "exceptions",
     "flow_actions",
     "flows",
@@ -33,5 +42,6 @@ __all__ = [
     "stats",
     "stg_cft_tcp",
     "transfers",
+    "views",
     "ssh_pull",
 ]

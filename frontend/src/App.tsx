@@ -13,7 +13,6 @@ function App() {
             <Routes>
                 <Route path="/" element={<Navigate to="/accueil" replace />} />
                 <Route path="/accueil" element={<MainLayout><LandingPage /></MainLayout>} />
-                <Route path="/server-config" element={<MainLayout><ServerConfigPage /></MainLayout>} />
                 <Route path="/database" element={<MainLayout><DatabasePage /></MainLayout>} />
                 <Route path="/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} />
                 <Route path="/b2bi" element={<MainLayout><B2biConfigPage /></MainLayout>} />
