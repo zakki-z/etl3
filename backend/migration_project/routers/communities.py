@@ -41,3 +41,16 @@ def list_community_routing_ids(community_id: str, db: Session = Depends(get_db))
         {"id": community_id},
     ).mappings().all()
     return [dict(r) for r in rows]
+
+
+# ── Flat router for the standalone community_routing_ids table view ───────
+routing_ids_router = APIRouter(prefix="/api/v1/community-routing-ids", tags=["communities"])
+
+
+@routing_ids_router.get("")
+def list_all_community_routing_ids(db: Session = Depends(get_db)) -> list[dict]:
+    """Return every routing id across all communities (flat table view)."""
+    rows = db.execute(
+        text("SELECT routing_id, community_id FROM community_routing_ids ORDER BY community_id, routing_id")
+    ).mappings().all()
+    return [dict(r) for r in rows]

@@ -11,8 +11,7 @@ from migration_project.db import Base
 
 class MigrationStatus(str, enum.Enum):
     """Per-row migration lifecycle, shared by b2bi_partner, b2bi_partner_delivery,
-    and b2bi_inbound_flow. Replaces the old job/exception-based tracking from the
-    retired Phase 2 generation engine (mapping_rule / generation_job / b2bi_config)."""
+    and b2bi_inbound_flow."""
 
     DRAFT = "DRAFT"
     READY = "READY"

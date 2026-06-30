@@ -46,117 +46,127 @@ export async function fetchFlowActions(): Promise<any[]>        { return api.get
 export async function fetchCFTConfig(): Promise<any[]>          { return api.get('/api/v1/moncft-configs'); }
 export async function fetchBoscoSendConfig(): Promise<any[]>    { return api.get('/api/v1/boscosend-configs'); }
 
-// ── Phase 2 — Generation jobs ─────────────────────────────────────────────
+// ── B2Bi domain — per-row migration_status (no jobs/exceptions/mapping rules) ──
 
-export interface GenerationJob {
-    id: number;
-    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-    started_at: string | null;
-    finished_at: string | null;
-    partners_total: number;
-    partners_ok: number;
-    partners_blocked: number;
-    created_at: string;
+export interface Community {
+    community_id: string;
+    name: string;
+    default_routing_id: string;
 }
+
+export async function fetchCommunities(): Promise<Community[]> {
+    return api.get('/api/v1/communities');
+}
+
+export type MigrationStatus = 'DRAFT' | 'READY' | 'PUSHED' | 'VALIDATED' | 'MIGRATED' | 'ERROR';
+
+export interface B2biPartner {
+    b2bi_partner_id: number;
+    partner_code: string;
+    party_name: string;
+    partner_contact: string | null;
+    b2bi_party_remote_id: string | null;
+    nrpart: string | null;
+    ssl: number | null;
+    migration_status: MigrationStatus;
+    nspart: string | null;
+    community_id: string;
+}
+
+export interface B2biPartnerDelivery {
+    partner_delivery_id: number;
+    friendly_name: string;
+    b2bi_delivery_remote_id: string | null;
+    host: string | null;
+    port: string | null;
+    parm: string | null;
+    idf: string;
+    nfname: string | null;
+    data_encoding: string | null;
+    record_format: string | null;
+    record_length: string | null;
+    fname: string | null;
+    migration_status: MigrationStatus;
+    b2bi_partner_id: number;
+    transfer_id: number;
+}
+
+export interface B2biInboundFlow {
+    inbound_flow_id: number;
+    idf: string;
+    fname: string | null;
+    parm: string | null;
+    nfname: string | null;
+    rename_rule: string | null;
+    migration_status: MigrationStatus;
+    b2bi_partner_id: number;
+    transfer_id: number;
+}
+
+export async function fetchB2biPartners(params?: {
+    migration_status?: MigrationStatus;
+    community_id?: string;
+}): Promise<B2biPartner[]> {
+    const qs = new URLSearchParams();
+    if (params?.migration_status) qs.set('migration_status', params.migration_status);
+    if (params?.community_id) qs.set('community_id', params.community_id);
+    const query = qs.toString();
+    return api.get(`/api/v1/b2bi-partners${query ? `?${query}` : ''}`);
+}
+
+export async function fetchB2biPartnerDeliveries(partnerId: number): Promise<B2biPartnerDelivery[]> {
+    return api.get(`/api/v1/b2bi-partners/${partnerId}/deliveries`);
+}
+
+export async function fetchB2biInboundFlows(partnerId: number): Promise<B2biInboundFlow[]> {
+    return api.get(`/api/v1/b2bi-partners/${partnerId}/inbound-flows`);
+}
+
+export async function updateB2biPartnerStatus(
+    partnerId: number,
+    migration_status: MigrationStatus,
+): Promise<{ b2bi_partner_id: number; migration_status: MigrationStatus }> {
+    return api.patch(`/api/v1/b2bi-partners/${partnerId}/status`, { migration_status });
+}
+
+export async function updateB2biDeliveryStatus(
+    deliveryId: number,
+    migration_status: MigrationStatus,
+): Promise<{ partner_delivery_id: number; migration_status: MigrationStatus }> {
+    return api.patch(`/api/v1/b2bi-partner-deliveries/${deliveryId}/status`, { migration_status });
+}
+
+export async function updateB2biInboundFlowStatus(
+    flowId: number,
+    migration_status: MigrationStatus,
+): Promise<{ inbound_flow_id: number; migration_status: MigrationStatus }> {
+    return api.patch(`/api/v1/b2bi-inbound-flows/${flowId}/status`, { migration_status });
+}
+
+// ── B2Bi generation (CFT → B2Bi) ────────────────────────────────────────────
 
 export interface GenerationReport {
-    job_id: number;
-    partners_total: number;
-    partners_ok: number;
-    partners_blocked: number;
-    configs_created: number;
-    exceptions_logged: number;
+    community_id: string;
+    partners_processed: number;
+    partners_ready: number;
+    partners_draft: number;
+    partners_error: number;
+    deliveries_created: number;
+    deliveries_updated: number;
+    inbound_flows_created: number;
+    inbound_flows_updated: number;
+    skipped_rows: number;
+    errors: string[];
 }
 
-export interface B2biConfig {
-    id: number;
-    job_id: number;
-    partner_id: string;
-    payload: Record<string, unknown>;
-    sync_status: 'PENDING' | 'APPROVED' | 'DEPLOYED' | 'FAILED';
-    generated_at: string;
-    approved_at: string | null;
-}
-
-export interface ExceptionLog {
-    id: number;
-    job_id: number;
-    partner_id: string;
-    severity: 'BLOCKING' | 'WARNING';
-    exception_type: string;
-    message: string;
-    resolved: boolean;
-    resolved_at: string | null;
-    resolution_note: string | null;
-    created_at: string;
-}
-
-export interface ExceptionSummary {
-    blocking_open: number;
-    blocking_resolved: number;
-    warning_open: number;
-    warning_resolved: number;
-}
-
-export interface MappingRule {
-    id: number;
-    rule_name: string;
-    source_field: string | null;
-    target_field: string;
-    transform_type: 'direct' | 'static' | 'lookup' | 'template';
-    transform_params: Record<string, unknown> | null;
-    is_active: boolean;
-    created_at: string;
-}
-
-export async function triggerGeneration(): Promise<GenerationReport> {
-    return api.post('/api/v1/generation-jobs');
-}
-
-export async function fetchGenerationJobs(): Promise<GenerationJob[]> {
-    return api.get('/api/v1/generation-jobs');
-}
-
-export async function fetchJobConfigs(jobId: number, syncStatus?: string): Promise<B2biConfig[]> {
-    const qs = syncStatus ? `?sync_status=${syncStatus}` : '';
-    return api.get(`/api/v1/generation-jobs/${jobId}/configs${qs}`);
-}
-
-export async function approveConfig(jobId: number, configId: number): Promise<{ id: number; sync_status: string }> {
-    return api.post(`/api/v1/generation-jobs/${jobId}/configs/${configId}/approve`);
-}
-
-// ── Phase 2 — Exceptions ──────────────────────────────────────────────────
-
-export async function fetchExceptions(params: {
-    job_id?: number;
-    severity?: string;
-    resolved?: boolean;
-}): Promise<ExceptionLog[]> {
-    const qs = new URLSearchParams();
-    if (params.job_id !== undefined) qs.set('job_id', String(params.job_id));
-    if (params.severity) qs.set('severity', params.severity);
-    if (params.resolved !== undefined) qs.set('resolved', String(params.resolved));
-    const query = qs.toString();
-    return api.get(`/api/v1/exceptions${query ? `?${query}` : ''}`);
-}
-
-export async function fetchExceptionSummary(jobId: number): Promise<ExceptionSummary> {
-    return api.get(`/api/v1/exceptions/jobs/${jobId}/summary`);
-}
-
-export async function resolveException(id: number, note?: string): Promise<{ id: number; resolved: boolean }> {
-    return api.post(`/api/v1/exceptions/${id}/resolve`, { note: note ?? null });
-}
-
-// ── Phase 2 — Mapping rules ───────────────────────────────────────────────
-
-export async function fetchMappingRules(): Promise<MappingRule[]> {
-    return api.get('/api/v1/mapping-rules');
-}
-
-export async function toggleMappingRule(id: number): Promise<{ id: number; is_active: boolean }> {
-    return api.patch(`/api/v1/mapping-rules/${id}/toggle`);
+export async function triggerB2biGeneration(
+    communityId: string,
+    partnerIds?: string[],
+): Promise<GenerationReport> {
+    return api.post('/api/v1/b2bi-generation/trigger', {
+        community_id: communityId,
+        partner_ids: partnerIds ?? null,
+    });
 }
 // ── SSH Pull ──────────────────────────────────────────────────────────────
 // Append this block to the bottom of src/services/api.ts

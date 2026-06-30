@@ -13,7 +13,7 @@ _VALID_STATUSES = {"DRAFT", "READY", "PUSHED", "VALIDATED", "MIGRATED", "ERROR"}
 
 _SELECT_COLUMNS = """
     b2bi_partner_id, partner_code, party_name, partner_contact,
-    b2bi_party_remote_id, nrpart, ssl, migration_status, nspart, community_id
+    b2bi_party_remote_id, nrpart, `ssl`, migration_status, nspart, community_id
 """
 
 

@@ -1,233 +1,194 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-    triggerGeneration,
-    fetchGenerationJobs,
-    fetchJobConfigs,
-    fetchExceptions,
-    fetchExceptionSummary,
-    fetchMappingRules,
-    approveConfig,
-    resolveException,
-    toggleMappingRule,
-    type GenerationJob,
-    type B2biConfig,
-    type ExceptionLog,
-    type ExceptionSummary,
-    type MappingRule,
+    fetchB2biPartners,
+    fetchB2biPartnerDeliveries,
+    fetchB2biInboundFlows,
+    updateB2biPartnerStatus,
+    updateB2biDeliveryStatus,
+    updateB2biInboundFlowStatus,
+    fetchCommunities,
+    triggerB2biGeneration,
+    type B2biPartner,
+    type B2biPartnerDelivery,
+    type B2biInboundFlow,
+    type Community,
+    type GenerationReport,
+    type MigrationStatus,
 } from '../../services/api';
 import './B2biConfigPage.css';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString('fr-FR', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-    });
+const STATUSES: MigrationStatus[] = ['DRAFT', 'READY', 'PUSHED', 'VALIDATED', 'MIGRATED', 'ERROR'];
+
+const STATUS_LABELS: Record<MigrationStatus, string> = {
+    DRAFT: 'Brouillon',
+    READY: 'Prêt',
+    PUSHED: 'Poussé',
+    VALIDATED: 'Validé',
+    MIGRATED: 'Migré',
+    ERROR: 'Erreur',
+};
+
+const STATUS_CLASS: Record<MigrationStatus, string> = {
+    DRAFT: 'badge badge--pending',
+    READY: 'badge badge--ok',
+    PUSHED: 'badge badge--pushed',
+    VALIDATED: 'badge badge--ok',
+    MIGRATED: 'badge badge--pushed',
+    ERROR: 'badge badge--error',
+};
+
+function StatusBadge({ status }: { status: MigrationStatus }) {
+    return <span className={STATUS_CLASS[status] ?? 'badge badge--pending'}>{STATUS_LABELS[status] ?? status}</span>;
 }
 
-function jobProgressPct(job: GenerationJob): number {
-    if (!job.partners_total) return 0;
-    return Math.round(((job.partners_ok + job.partners_blocked) / job.partners_total) * 100);
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function JobBadge({ status }: { status: GenerationJob['status'] }) {
-    const map: Record<string, string> = {
-        PENDING:     'badge badge--pending',
-        IN_PROGRESS: 'badge badge--running',
-        COMPLETED:   'badge badge--ok',
-        FAILED:      'badge badge--error',
-    };
-    const labels: Record<string, string> = {
-        PENDING:     'En attente',
-        IN_PROGRESS: 'En cours',
-        COMPLETED:   'Terminé',
-        FAILED:      'Échoué',
-    };
-    return <span className={map[status] ?? 'badge badge--pending'}>{labels[status] ?? status}</span>;
-}
-
-function SyncBadge({ status }: { status: B2biConfig['sync_status'] }) {
-    const map: Record<string, string> = {
-        PENDING:  'badge badge--pending',
-        APPROVED: 'badge badge--ok',
-        DEPLOYED: 'badge badge--pushed',
-        FAILED:   'badge badge--error',
-    };
-    const labels: Record<string, string> = {
-        PENDING:  'Brouillon',
-        APPROVED: 'Approuvé',
-        DEPLOYED: 'Déployé',
-        FAILED:   'Erreur',
-    };
-    return <span className={map[status] ?? 'badge badge--pending'}>{labels[status] ?? status}</span>;
-}
-
-function ProgressBar({ job }: { job: GenerationJob }) {
-    const pct = jobProgressPct(job);
-    const cls = job.status === 'COMPLETED' ? 'completed'
-        : job.status === 'FAILED'    ? 'failed'
-            : job.status === 'IN_PROGRESS' ? 'running'
-                : 'pending';
+function StatusSelect({
+                          value,
+                          onChange,
+                      }: {
+    value: MigrationStatus;
+    onChange: (next: MigrationStatus) => void;
+}) {
     return (
-        <div className="progress-wrap">
-            <div className="progress-track">
-                <div className={`progress-fill progress-fill--${cls}`} style={{ width: `${pct}%` }} />
-            </div>
-            <span className="progress-label">{pct}%</span>
-        </div>
+        <select
+            className="status-select"
+            value={value}
+            onChange={(e) => onChange(e.target.value as MigrationStatus)}
+        >
+            {STATUSES.map((s) => (
+                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+            ))}
+        </select>
     );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function B2biConfigPage() {
-    const [jobs, setJobs] = useState<GenerationJob[]>([]);
-    const [selectedJob, setSelectedJob] = useState<GenerationJob | null>(null);
-    const [configs, setConfigs] = useState<B2biConfig[]>([]);
-    const [exceptions, setExceptions] = useState<ExceptionLog[]>([]);
-    const [summary, setSummary] = useState<ExceptionSummary | null>(null);
-    const [rules, setRules] = useState<MappingRule[]>([]);
+    const [partners, setPartners] = useState<B2biPartner[]>([]);
+    const [selectedPartner, setSelectedPartner] = useState<B2biPartner | null>(null);
+    const [deliveries, setDeliveries] = useState<B2biPartnerDelivery[]>([]);
+    const [inboundFlows, setInboundFlows] = useState<B2biInboundFlow[]>([]);
+
+    const [communities, setCommunities] = useState<Community[]>([]);
+    const [generationCommunityId, setGenerationCommunityId] = useState<string>('');
+    const [generating, setGenerating] = useState(false);
+    const [generationReport, setGenerationReport] = useState<GenerationReport | null>(null);
 
     const [loading, setLoading] = useState(true);
-    const [triggering, setTriggering] = useState(false);
-    const [triggerMsg, setTriggerMsg] = useState<{ text: string; ok: boolean } | null>(null);
-    const [excFilter, setExcFilter] = useState<'all' | 'BLOCKING' | 'unresolved'>('all');
-
-    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [statusFilter, setStatusFilter] = useState<MigrationStatus | 'all'>('all');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // ── Loaders ───────────────────────────────────────────────────────────────
 
-    const loadJobs = useCallback(async () => {
-        const data = await fetchGenerationJobs().catch(() => [] as GenerationJob[]);
-        setJobs(data);
+    const loadPartners = useCallback(async () => {
+        const data = await fetchB2biPartners(
+            statusFilter === 'all' ? undefined : { migration_status: statusFilter },
+        ).catch(() => [] as B2biPartner[]);
+        setPartners(data);
         return data;
-    }, []);
+    }, [statusFilter]);
 
-    const loadJobDetails = useCallback(async (job: GenerationJob) => {
-        const [cfgs, excs, sum] = await Promise.all([
-            fetchJobConfigs(job.id).catch(() => [] as B2biConfig[]),
-            fetchExceptions({ job_id: job.id }).catch(() => [] as ExceptionLog[]),
-            fetchExceptionSummary(job.id).catch(() => null),
+    const loadPartnerDetails = useCallback(async (partner: B2biPartner) => {
+        const [dels, flows] = await Promise.all([
+            fetchB2biPartnerDeliveries(partner.b2bi_partner_id).catch(() => [] as B2biPartnerDelivery[]),
+            fetchB2biInboundFlows(partner.b2bi_partner_id).catch(() => [] as B2biInboundFlow[]),
         ]);
-        setConfigs(cfgs);
-        setExceptions(excs);
-        setSummary(sum);
+        setDeliveries(dels);
+        setInboundFlows(flows);
     }, []);
 
-    const loadRules = useCallback(async () => {
-        const data = await fetchMappingRules().catch(() => [] as MappingRule[]);
-        setRules(data);
-    }, []);
-
-    // Initial load
     useEffect(() => {
         setLoading(true);
-        Promise.all([loadJobs(), loadRules()]).then(([data]) => {
-            if (data.length > 0) {
-                setSelectedJob(data[0]);
-            }
+        loadPartners().then((data) => {
+            setSelectedPartner((prev) => {
+                if (prev && data.some((p) => p.b2bi_partner_id === prev.b2bi_partner_id)) return prev;
+                return data[0] ?? null;
+            });
             setLoading(false);
         });
-    }, [loadJobs, loadRules]);
+    }, [loadPartners]);
 
-    // Load job details when selection changes
     useEffect(() => {
-        if (selectedJob) loadJobDetails(selectedJob);
-    }, [selectedJob, loadJobDetails]);
+        fetchCommunities().then((data) => {
+            setCommunities(data);
+            setGenerationCommunityId((prev) => prev || data[0]?.community_id || '');
+        }).catch(() => setCommunities([]));
+    }, []);
 
-    // Poll while a job is active
     useEffect(() => {
-        const isActive = jobs.some(
-            (j) => j.status === 'IN_PROGRESS' || j.status === 'PENDING',
-        );
-        if (isActive && !pollingRef.current) {
-            pollingRef.current = setInterval(async () => {
-                const updated = await loadJobs();
-                if (selectedJob) {
-                    const fresh = updated.find((j) => j.id === selectedJob.id);
-                    if (fresh) {
-                        setSelectedJob(fresh);
-                        loadJobDetails(fresh);
-                    }
-                }
-            }, 4000);
-        } else if (!isActive && pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
+        if (selectedPartner) loadPartnerDetails(selectedPartner);
+        else {
+            setDeliveries([]);
+            setInboundFlows([]);
         }
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, [jobs, selectedJob, loadJobs, loadJobDetails]);
+    }, [selectedPartner, loadPartnerDetails]);
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
-    const handleTrigger = async () => {
-        setTriggering(true);
-        setTriggerMsg(null);
+    const handleGenerate = async () => {
+        if (!generationCommunityId) {
+            setErrorMsg('Sélectionnez une communauté cible avant de lancer la génération.');
+            return;
+        }
+        setGenerating(true);
+        setErrorMsg(null);
+        setGenerationReport(null);
         try {
-            const report = await triggerGeneration();
-            setTriggerMsg({
-                text: `Job #${report.job_id} terminé — ${report.partners_ok} OK, ${report.partners_blocked} bloqués, ${report.exceptions_logged} exceptions.`,
-                ok: true,
-            });
-            const updated = await loadJobs();
-            const fresh = updated.find((j) => j.id === report.job_id);
-            if (fresh) {
-                setSelectedJob(fresh);
-                loadJobDetails(fresh);
+            const report = await triggerB2biGeneration(generationCommunityId);
+            setGenerationReport(report);
+            const updated = await loadPartners();
+            if (selectedPartner) {
+                const fresh = updated.find((p) => p.b2bi_partner_id === selectedPartner.b2bi_partner_id);
+                if (fresh) setSelectedPartner(fresh);
+            } else if (updated.length > 0) {
+                setSelectedPartner(updated[0]);
             }
         } catch (e: any) {
-            setTriggerMsg({ text: e.message || 'Échec du déclenchement.', ok: false });
+            setErrorMsg(e.message || 'Échec de la génération.');
         } finally {
-            setTriggering(false);
+            setGenerating(false);
         }
     };
 
-    const handleApprove = async (config: B2biConfig) => {
+    const handlePartnerStatusChange = async (partner: B2biPartner, next: MigrationStatus) => {
+        setErrorMsg(null);
         try {
-            await approveConfig(config.job_id, config.id);
-            if (selectedJob) loadJobDetails(selectedJob);
+            await updateB2biPartnerStatus(partner.b2bi_partner_id, next);
+            const updated = await loadPartners();
+            const fresh = updated.find((p) => p.b2bi_partner_id === partner.b2bi_partner_id);
+            if (fresh) setSelectedPartner(fresh);
         } catch (e: any) {
-            alert(`Erreur : ${e.message}`);
+            setErrorMsg(e.message || 'Échec de la mise à jour du statut.');
         }
     };
 
-    const handleResolve = async (exc: ExceptionLog) => {
+    const handleDeliveryStatusChange = async (delivery: B2biPartnerDelivery, next: MigrationStatus) => {
+        setErrorMsg(null);
         try {
-            await resolveException(exc.id);
-            if (selectedJob) loadJobDetails(selectedJob);
+            await updateB2biDeliveryStatus(delivery.partner_delivery_id, next);
+            if (selectedPartner) loadPartnerDetails(selectedPartner);
         } catch (e: any) {
-            alert(`Erreur : ${e.message}`);
+            setErrorMsg(e.message || 'Échec de la mise à jour du statut.');
         }
     };
 
-    const handleToggleRule = async (rule: MappingRule) => {
+    const handleFlowStatusChange = async (flow: B2biInboundFlow, next: MigrationStatus) => {
+        setErrorMsg(null);
         try {
-            const res = await toggleMappingRule(rule.id);
-            setRules((prev) =>
-                prev.map((r) => (r.id === rule.id ? { ...r, is_active: res.is_active } : r)),
-            );
+            await updateB2biInboundFlowStatus(flow.inbound_flow_id, next);
+            if (selectedPartner) loadPartnerDetails(selectedPartner);
         } catch (e: any) {
-            alert(`Erreur : ${e.message}`);
+            setErrorMsg(e.message || 'Échec de la mise à jour du statut.');
         }
     };
 
     // ── Derived data ──────────────────────────────────────────────────────────
 
-    const filteredExceptions = exceptions.filter((e) => {
-        if (excFilter === 'BLOCKING') return e.severity === 'BLOCKING';
-        if (excFilter === 'unresolved') return !e.resolved;
-        return true;
-    });
-
-    const syncGroups = configs.reduce(
-        (acc, c) => { acc[c.sync_status] = (acc[c.sync_status] ?? 0) + 1; return acc; },
-        { PENDING: 0, APPROVED: 0, DEPLOYED: 0, FAILED: 0 } as Record<B2biConfig['sync_status'], number>,
+    const statusGroups = partners.reduce(
+        (acc, p) => { acc[p.migration_status] = (acc[p.migration_status] ?? 0) + 1; return acc; },
+        { DRAFT: 0, READY: 0, PUSHED: 0, VALIDATED: 0, MIGRATED: 0, ERROR: 0 } as Record<MigrationStatus, number>,
     );
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -238,113 +199,102 @@ export default function B2biConfigPage() {
             {/* ── Header ─────────────────────────────────────────────────── */}
             <div className="b2bi-header">
                 <div>
-                    <h2>Migration B2Bi — Phase 2</h2>
+                    <h2>Migration B2Bi</h2>
                     <p className="b2bi-subtitle">
-                        Génération et déploiement des configurations Trading Partner Axway B2Bi
+                        Partenaires, livraisons et flux entrants B2Bi, et leur statut de migration
                     </p>
                 </div>
-                <button
-                    type="button"
-                    className="trigger-btn"
-                    onClick={handleTrigger}
-                    disabled={triggering}
-                >
-                    {triggering ? 'Génération en cours…' : '▶ Lancer une génération'}
-                </button>
+                <div className="generation-controls">
+                    <select
+                        className="status-select"
+                        value={generationCommunityId}
+                        onChange={(e) => setGenerationCommunityId(e.target.value)}
+                        disabled={generating || communities.length === 0}
+                    >
+                        {communities.length === 0 && <option value="">Aucune communauté</option>}
+                        {communities.map((c) => (
+                            <option key={c.community_id} value={c.community_id}>{c.name}</option>
+                        ))}
+                    </select>
+                    <button
+                        type="button"
+                        className="trigger-btn"
+                        onClick={handleGenerate}
+                        disabled={generating || !generationCommunityId}
+                    >
+                        {generating ? 'Génération en cours…' : '▶ Générer la config B2Bi depuis CFT'}
+                    </button>
+                </div>
             </div>
 
-            {triggerMsg && (
-                <div className={`trigger-msg ${triggerMsg.ok ? 'trigger-msg--ok' : 'trigger-msg--error'}`}>
-                    {triggerMsg.text}
+            {generationReport && (
+                <div className="trigger-msg trigger-msg--ok">
+                    {generationReport.partners_processed} partenaire(s) traité(s) — {generationReport.partners_ready} prêt(s),{' '}
+                    {generationReport.partners_draft} brouillon(s), {generationReport.partners_error} en erreur ·{' '}
+                    {generationReport.deliveries_created} livraison(s) créée(s) / {generationReport.deliveries_updated} mise(s) à jour ·{' '}
+                    {generationReport.inbound_flows_created} flux entrant(s) créé(s) / {generationReport.inbound_flows_updated} mis à jour
+                    {generationReport.errors.length > 0 && (
+                        <ul className="generation-errors">
+                            {generationReport.errors.map((err, i) => <li key={i}>{err}</li>)}
+                        </ul>
+                    )}
                 </div>
             )}
+
+            {errorMsg && <div className="trigger-msg trigger-msg--error">{errorMsg}</div>}
 
             {loading && <div className="b2bi-loading">Chargement…</div>}
 
             {!loading && (
                 <>
-                    {/* ── Pipeline bar ────────────────────────────────────── */}
-                    <div className="pipeline-bar">
-                        {[
-                            { label: 'Inventaire CFT',  phase: 1, done: true },
-                            {
-                                label: 'Génération B2Bi', phase: 2,
-                                done: jobs.some((j) => j.status === 'COMPLETED'),
-                                active: jobs.some((j) => j.status === 'IN_PROGRESS'),
-                            },
-                            { label: 'Déploiement', phase: 3, done: syncGroups.DEPLOYED > 0 },
-                        ].map((step, i) => (
-                            <div
-                                key={step.label}
-                                className={`pipeline-step ${
-                                    step.done   ? 'pipeline-step--done'
-                                        : step.active ? 'pipeline-step--active'
-                                            : ''
-                                }`}
+                    {/* ── Status legend / filter ─────────────────────────── */}
+                    <div className="sync-legend">
+                        <button
+                            type="button"
+                            className={`filter-btn ${statusFilter === 'all' ? 'filter-btn--active' : ''}`}
+                            onClick={() => setStatusFilter('all')}
+                        >
+                            Tous ({partners.length})
+                        </button>
+                        {STATUSES.map((s) => (
+                            <button
+                                key={s}
+                                type="button"
+                                className={`filter-btn ${statusFilter === s ? 'filter-btn--active' : ''}`}
+                                onClick={() => setStatusFilter(s)}
                             >
-                                <div className="pipeline-step-num">{step.phase}</div>
-                                <span className="pipeline-step-label">{step.label}</span>
-                                {i < 2 && <div className="pipeline-step-arrow">→</div>}
-                            </div>
+                                {STATUS_LABELS[s]} ({statusGroups[s]})
+                            </button>
                         ))}
                     </div>
-
-                    {/* ── Metric cards ───────────────────────────────────── */}
-                    {selectedJob && (
-                        <div className="metrics-row">
-                            <div className="metric-card">
-                                <span className="metric-label">Partenaires total</span>
-                                <strong className="metric-value">{selectedJob.partners_total}</strong>
-                            </div>
-                            <div className="metric-card">
-                                <span className="metric-label">Générés (OK)</span>
-                                <strong className="metric-value metric-value--ok">{selectedJob.partners_ok}</strong>
-                            </div>
-                            <div className="metric-card">
-                                <span className="metric-label">Bloqués</span>
-                                <strong className="metric-value metric-value--error">{selectedJob.partners_blocked}</strong>
-                            </div>
-                            <div className="metric-card">
-                                <span className="metric-label">Exceptions bloquantes</span>
-                                <strong className="metric-value metric-value--error">
-                                    {summary ? summary.blocking_open : '—'}
-                                </strong>
-                            </div>
-                            <div className="metric-card">
-                                <span className="metric-label">Configs approuvées</span>
-                                <strong className="metric-value metric-value--pushed">{syncGroups.APPROVED}</strong>
-                            </div>
-                        </div>
-                    )}
 
                     {/* ── Main grid ──────────────────────────────────────── */}
                     <div className="b2bi-grid">
 
-                        {/* Jobs panel */}
+                        {/* Partners panel */}
                         <div className="panel">
                             <div className="panel-header">
-                                <h3>Jobs de génération</h3>
-                                <span className="panel-count">{jobs.length}</span>
+                                <h3>Partenaires B2Bi</h3>
+                                <span className="panel-count">{partners.length}</span>
                             </div>
 
-                            {jobs.length === 0 ? (
-                                <p className="empty-hint">Aucun job — lancez une génération ci-dessus.</p>
+                            {partners.length === 0 ? (
+                                <p className="empty-hint">Aucun partenaire pour ce filtre.</p>
                             ) : (
                                 <ul className="job-list">
-                                    {jobs.map((job) => (
+                                    {partners.map((partner) => (
                                         <li
-                                            key={job.id}
-                                            className={`job-item ${selectedJob?.id === job.id ? 'job-item--selected' : ''}`}
-                                            onClick={() => setSelectedJob(job)}
+                                            key={partner.b2bi_partner_id}
+                                            className={`job-item ${selectedPartner?.b2bi_partner_id === partner.b2bi_partner_id ? 'job-item--selected' : ''}`}
+                                            onClick={() => setSelectedPartner(partner)}
                                         >
                                             <div className="job-item-top">
-                                                <span className="job-name">Job #{job.id}</span>
-                                                <JobBadge status={job.status} />
+                                                <span className="job-name">{partner.party_name}</span>
+                                                <StatusBadge status={partner.migration_status} />
                                             </div>
-                                            <ProgressBar job={job} />
                                             <div className="job-item-meta">
-                                                <span>{job.partners_ok} ok · {job.partners_blocked} bloqués</span>
-                                                <span>{formatDate(job.created_at)}</span>
+                                                <span>{partner.partner_code}</span>
+                                                <span>{partner.community_id}</span>
                                             </div>
                                         </li>
                                     ))}
@@ -352,170 +302,41 @@ export default function B2biConfigPage() {
                             )}
                         </div>
 
-                        {/* Exceptions panel */}
-                        <div className="panel">
-                            <div className="panel-header">
-                                <h3>Exceptions</h3>
-                                {selectedJob && (
-                                    <div className="exc-filters">
-                                        {(['all', 'BLOCKING', 'unresolved'] as const).map((f) => (
-                                            <button
-                                                key={f}
-                                                type="button"
-                                                className={`filter-btn ${excFilter === f ? 'filter-btn--active' : ''}`}
-                                                onClick={() => setExcFilter(f)}
-                                            >
-                                                {f === 'all'
-                                                    ? `Toutes (${exceptions.length})`
-                                                    : f === 'BLOCKING'
-                                                        ? `⛔ Bloquantes (${summary?.blocking_open ?? 0})`
-                                                        : `Non résolues (${exceptions.filter((e) => !e.resolved).length})`}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {!selectedJob ? (
-                                <p className="empty-hint">Sélectionnez un job pour voir ses exceptions.</p>
-                            ) : filteredExceptions.length === 0 ? (
-                                <p className="empty-hint">
-                                    {excFilter === 'all'
-                                        ? '✅ Aucune exception pour ce job.'
-                                        : 'Aucune exception dans ce filtre.'}
-                                </p>
-                            ) : (
-                                <ul className="exc-list">
-                                    {filteredExceptions.map((exc) => (
-                                        <li
-                                            key={exc.id}
-                                            className={`exc-item ${exc.resolved ? 'exc-item--resolved' : ''}`}
-                                        >
-                                            <div className="exc-item-top">
-                                                <span className={`exc-badge exc-badge--${exc.severity === 'BLOCKING' ? 'blocking' : 'warning'}`}>
-                                                    {exc.severity === 'BLOCKING' ? '⛔ ' : '⚠ '}
-                                                    {exc.exception_type.replace(/_/g, ' ')}
-                                                </span>
-                                                {exc.resolved
-                                                    ? <span className="resolved-mark">✓ résolu</span>
-                                                    : (
-                                                        <button
-                                                            type="button"
-                                                            className="action-btn-sm"
-                                                            onClick={() => handleResolve(exc)}
-                                                        >
-                                                            Résoudre
-                                                        </button>
-                                                    )}
-                                            </div>
-                                            <div className="exc-item-meta">
-                                                <span className="exc-partner">{exc.partner_id}</span>
-                                                <span className="exc-field" title={exc.message}>
-                                                    {exc.message.length > 60
-                                                        ? exc.message.slice(0, 57) + '…'
-                                                        : exc.message}
-                                                </span>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-
-                        {/* B2Bi configs panel */}
+                        {/* Deliveries panel */}
                         <div className="panel panel--wide">
                             <div className="panel-header">
-                                <h3>Configs B2Bi générées</h3>
-                                <div className="sync-legend">
-                                    {(['PENDING', 'APPROVED', 'DEPLOYED', 'FAILED'] as B2biConfig['sync_status'][]).map((s) => (
-                                        <span key={s} className="sync-pill">
-                                            <span className={`sync-dot sync-dot--${s.toLowerCase()}`} />
-                                            {s.toLowerCase()} ({syncGroups[s]})
-                                        </span>
-                                    ))}
-                                </div>
+                                <h3>Livraisons</h3>
+                                <span className="panel-count">{deliveries.length}</span>
                             </div>
 
-                            {!selectedJob ? (
-                                <p className="empty-hint">Sélectionnez un job pour voir ses configs.</p>
-                            ) : configs.length === 0 ? (
-                                <p className="empty-hint">Aucune config générée pour ce job.</p>
-                            ) : (
-                                <div className="config-table-wrap">
-                                    <table className="config-table">
-                                        <thead>
-                                        <tr>
-                                            <th>Partenaire</th>
-                                            <th>Statut</th>
-                                            <th>Généré le</th>
-                                            <th>Approuvé le</th>
-                                            <th></th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {configs.map((c) => (
-                                            <tr key={c.id}>
-                                                <td className="td-name">{c.partner_id}</td>
-                                                <td><SyncBadge status={c.sync_status} /></td>
-                                                <td>{formatDate(c.generated_at)}</td>
-                                                <td>{formatDate(c.approved_at)}</td>
-                                                <td>
-                                                    {c.sync_status === 'PENDING' && (
-                                                        <button
-                                                            type="button"
-                                                            className="action-btn-sm action-btn-sm--primary"
-                                                            onClick={() => handleApprove(c)}
-                                                        >
-                                                            Approuver
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Mapping rules panel */}
-                        <div className="panel panel--wide">
-                            <div className="panel-header">
-                                <h3>Règles de mapping</h3>
-                                <span className="panel-count">
-                                    {rules.filter((r) => r.is_active).length} actives / {rules.length}
-                                </span>
-                            </div>
-
-                            {rules.length === 0 ? (
-                                <p className="empty-hint">Aucune règle — exécutez le script SQL 010.</p>
+                            {!selectedPartner ? (
+                                <p className="empty-hint">Sélectionnez un partenaire pour voir ses livraisons.</p>
+                            ) : deliveries.length === 0 ? (
+                                <p className="empty-hint">Aucune livraison pour ce partenaire.</p>
                             ) : (
                                 <div className="config-table-wrap">
                                     <table className="config-table">
                                         <thead>
                                         <tr>
                                             <th>Nom</th>
-                                            <th>Source</th>
-                                            <th>Cible</th>
-                                            <th>Type</th>
-                                            <th>Actif</th>
+                                            <th>Hôte</th>
+                                            <th>Port</th>
+                                            <th>IDF</th>
+                                            <th>Statut</th>
                                         </tr>
                                         </thead>
                                         <tbody>
-                                        {rules.map((rule) => (
-                                            <tr key={rule.id}>
-                                                <td className="td-name">{rule.rule_name}</td>
-                                                <td className="td-mono">{rule.source_field ?? '—'}</td>
-                                                <td className="td-mono">{rule.target_field}</td>
-                                                <td>{rule.transform_type}</td>
+                                        {deliveries.map((d) => (
+                                            <tr key={d.partner_delivery_id}>
+                                                <td className="td-name">{d.friendly_name}</td>
+                                                <td className="td-mono">{d.host ?? '—'}</td>
+                                                <td className="td-mono">{d.port ?? '—'}</td>
+                                                <td className="td-mono">{d.idf}</td>
                                                 <td>
-                                                    <button
-                                                        type="button"
-                                                        className={`toggle-btn ${rule.is_active ? 'toggle-btn--on' : 'toggle-btn--off'}`}
-                                                        onClick={() => handleToggleRule(rule)}
-                                                    >
-                                                        {rule.is_active ? 'Oui' : 'Non'}
-                                                    </button>
+                                                    <StatusSelect
+                                                        value={d.migration_status}
+                                                        onChange={(next) => handleDeliveryStatusChange(d, next)}
+                                                    />
                                                 </td>
                                             </tr>
                                         ))}
@@ -524,6 +345,74 @@ export default function B2biConfigPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Inbound flows panel */}
+                        <div className="panel panel--wide">
+                            <div className="panel-header">
+                                <h3>Flux entrants</h3>
+                                <span className="panel-count">{inboundFlows.length}</span>
+                            </div>
+
+                            {!selectedPartner ? (
+                                <p className="empty-hint">Sélectionnez un partenaire pour voir ses flux.</p>
+                            ) : inboundFlows.length === 0 ? (
+                                <p className="empty-hint">Aucun flux entrant pour ce partenaire.</p>
+                            ) : (
+                                <div className="config-table-wrap">
+                                    <table className="config-table">
+                                        <thead>
+                                        <tr>
+                                            <th>IDF</th>
+                                            <th>Fichier</th>
+                                            <th>Renommage</th>
+                                            <th>Statut</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {inboundFlows.map((f) => (
+                                            <tr key={f.inbound_flow_id}>
+                                                <td className="td-mono">{f.idf}</td>
+                                                <td className="td-mono">{f.fname ?? '—'}</td>
+                                                <td className="td-mono">{f.rename_rule ?? '—'}</td>
+                                                <td>
+                                                    <StatusSelect
+                                                        value={f.migration_status}
+                                                        onChange={(next) => handleFlowStatusChange(f, next)}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Partner detail / status control panel */}
+                        {selectedPartner && (
+                            <div className="panel panel--wide">
+                                <div className="panel-header">
+                                    <h3>Statut du partenaire</h3>
+                                </div>
+                                <div className="metrics-row">
+                                    <div className="metric-card">
+                                        <span className="metric-label">Partenaire</span>
+                                        <strong className="metric-value">{selectedPartner.party_name}</strong>
+                                    </div>
+                                    <div className="metric-card">
+                                        <span className="metric-label">Code</span>
+                                        <strong className="metric-value">{selectedPartner.partner_code}</strong>
+                                    </div>
+                                    <div className="metric-card">
+                                        <span className="metric-label">Statut</span>
+                                        <StatusSelect
+                                            value={selectedPartner.migration_status}
+                                            onChange={(next) => handlePartnerStatusChange(selectedPartner, next)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                     </div>
                 </>
