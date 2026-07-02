@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import DataTable from '../../components/database/database';
-import { tableDefinitions, DatabaseTable, fetchTableRows } from '../../services/databaseService';
+import { tableDefinitions, DatabaseTable, fetchTableRows, downloadTableAsJson } from '../../services/databaseService';
 import './databasepage.css';
 
 function DatabasePage() {
@@ -62,6 +62,19 @@ function DatabasePage() {
                             <span>⚠</span> {error}
                             <button type="button" onClick={loadTable} className="retry-btn">
                                 Réessayer
+                            </button>
+                        </div>
+                    )}
+
+                    {currentTable && !loading && (
+                        <div className="table-toolbar">
+                            <button
+                                type="button"
+                                className="download-btn"
+                                onClick={() => downloadTableAsJson(currentTable)}
+                                disabled={currentTable.rows.length === 0}
+                            >
+                                ⬇ Télécharger JSON
                             </button>
                         </div>
                     )}

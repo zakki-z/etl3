@@ -393,3 +393,28 @@ export async function triggerPipeline(): Promise<{ dag_run_id: string; state: st
     return null;
   }
 }
+// ── Export helpers ───────────────────────────────────────────────────────
+
+/**
+ * Triggers a browser download of the given rows as a formatted JSON file.
+ */
+export function downloadTableAsJson(table: DatabaseTable): void {
+  const payload = {
+    table: table.name,
+    exported_at: new Date().toISOString(),
+    row_count: table.rows.length,
+    rows: table.rows,
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${table.name}_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+}
